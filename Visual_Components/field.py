@@ -51,16 +51,20 @@ class SoccerField:
                          (self.width - 20, 0, 20, goal_top))
         pygame.draw.rect(self.screen, self.BLACK,
                          (self.width - 20, goal_top + goal_height, 20, goal_top))
+        
+        self._draw_goal_net()
+        
 
-        net_spacing = 10
-        for i in range(0, goal_height, net_spacing):
-            pygame.draw.line(self.screen, self.WHITE,
-                             (20, goal_top + i),
-                             (0, goal_top + i), 2)
+        # TODO: Fix net
+            # net_spacing = 10
+        # for i in range(0, goal_height, net_spacing):
+        #     pygame.draw.line(self.screen, self.WHITE,
+        #                      (20, goal_top + i),
+        #                      (0, goal_top + i), 2)
 
-            pygame.draw.line(self.screen, self.WHITE,
-                             (self.width - 20, goal_top + i),
-                             (self.width, goal_top + i), 2)
+        #     pygame.draw.line(self.screen, self.WHITE,
+        #                      (self.width - 20, goal_top + i),
+        #                      (self.width, goal_top + i), 2)
 
         for idx, player in enumerate(self.players):
             player.draw(self.screen, idx)
@@ -114,6 +118,20 @@ class SoccerField:
             self.draw_field()
             pygame.display.flip()
             self.clock.tick(60)
+
+    def _draw_goal_net(self):
+        goal_top = (self.height - 100) // 2
+        goal_depth = 40
+        net_spacing = 5
+        net_color = (200, 200, 200)
+        for x in range(0, goal_depth, net_spacing):
+            for y in range(goal_top, goal_top + 100, net_spacing):
+                pygame.draw.line(self.screen, net_color, (20 - x, y), (20 - x, y + net_spacing), 1)
+                pygame.draw.line(self.screen, net_color, (20 - x, y), (20, y), 1)
+        for x in range(0, goal_depth, net_spacing):
+            for y in range(goal_top, goal_top + 100, net_spacing):
+                pygame.draw.line(self.screen, net_color, (self.width - 20 + x, y), (self.width - 20 + x, y + net_spacing), 1)
+                pygame.draw.line(self.screen, net_color, (self.width - 20 + x, y), (self.width - 20, y), 1)
 
 
 if __name__ == "__main__":
