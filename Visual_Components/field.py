@@ -53,19 +53,6 @@ class SoccerField:
                          (self.width - 20, goal_top + goal_height, 20, goal_top))
         
         self._draw_goal_net()
-        
-
-        # TODO: Fix net
-            # net_spacing = 10
-        # for i in range(0, goal_height, net_spacing):
-        #     pygame.draw.line(self.screen, self.WHITE,
-        #                      (20, goal_top + i),
-        #                      (0, goal_top + i), 2)
-
-        #     pygame.draw.line(self.screen, self.WHITE,
-        #                      (self.width - 20, goal_top + i),
-        #                      (self.width, goal_top + i), 2)
-
         for idx, player in enumerate(self.players):
             player.draw(self.screen, idx)
 
