@@ -1,5 +1,7 @@
 import pygame
 import sys
+
+from Visual_Components.ball import Ball
 from player import Player
 
 
@@ -19,12 +21,16 @@ class SoccerField:
 
         self.players = [
             Player(150, 200, self.BLUE, 'blue'),
-            Player(250, 150, self.BLUE, 'blue'),
+            # Player(250, 150, self.BLUE, 'blue'),
             Player(450, 250, self.RED, 'red'),
-            Player(550, 200, self.RED, 'red')
+            # Player(550, 200, self.RED, 'red')
         ]
 
         self.clock = pygame.time.Clock()
+        self.ball = Ball(width // 2, height // 2)
+        self.red_score = 0
+        self.blue_score = 0
+        self.kickoff_started = False
 
     def draw_field(self):
         self.screen.fill(self.GREEN)
@@ -54,9 +60,16 @@ class SoccerField:
         
         self._draw_goal_net()
         for idx, player in enumerate(self.players):
-            player.draw(self.screen, idx)
+            player.draw(self.screen)
+
+        self.ball.draw(self.screen)
+        self.draw_scores()
+
+    def reset_game(self):
+        self.ball.reset_position(self.width // 2, self.height // 2)
 
     def run(self):
+        self.reset_game()
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -67,44 +80,139 @@ class SoccerField:
             # THis is for debugging only ( can only dfo one player for now just )
             # to test controls/collisons
             # Blue team controls
-            if keys[pygame.K_w]:
-                self.players[0].move(
-                    0, -1, self.width, self.height, self.players)
-            if keys[pygame.K_s]:
-                self.players[0].move(
-                    0, 1, self.width, self.height, self.players)
-            if keys[pygame.K_a]:
-                self.players[0].move(-1, 0, self.width,
-                                     self.height, self.players)
-            if keys[pygame.K_d]:
-                self.players[0].move(
-                    1, 0, self.width, self.height, self.players)
-            if keys[pygame.K_q]:
-                self.players[0].turn(5)
-            if keys[pygame.K_e]:
-                self.players[0].turn(-5)
+            if not self.players[0].frozen:
+                if keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]:
+                    if not self.kickoff_started:  # Detect kickoff start
+                        print("Kickoff started by Blue Team!")
+                        self.unfreeze_team("red")  # Unfreeze red team
+                        self.kickoff_started = True
+                if keys[pygame.K_w]:
+                    self.players[0].move(
+                        0, -1, self.width, self.height, self.players)
+                if keys[pygame.K_s]:
+                    self.players[0].move(
+                        0, 1, self.width, self.height, self.players)
+                if keys[pygame.K_a]:
+                    self.players[0].move(-1, 0, self.width,
+                                         self.height, self.players)
+                if keys[pygame.K_d]:
+                    self.players[0].move(
+                        1, 0, self.width, self.height, self.players)
+            # if keys[pygame.K_q]:
+            #     self.players[0].turn(5)
+            # if keys[pygame.K_e]:
+            #     self.players[0].turn(-5)
+
+            # if keys[pygame.K_SPACE]:
+            #     self.players[0].kick_ball(self.ball)
 
             # Red team controls
-            if keys[pygame.K_UP]:
-                self.players[2].move(
-                    0, -1, self.width, self.height, self.players)
-            if keys[pygame.K_DOWN]:
-                self.players[2].move(
-                    0, 1, self.width, self.height, self.players)
-            if keys[pygame.K_LEFT]:
-                self.players[2].move(-1, 0, self.width,
-                                     self.height, self.players)
-            if keys[pygame.K_RIGHT]:
-                self.players[2].move(
-                    1, 0, self.width, self.height, self.players)
-            if keys[pygame.K_m]:
-                self.players[2].turn(5)
-            if keys[pygame.K_n]:
-                self.players[2].turn(-5)
+            if not self.players[1].frozen:
+                if keys[pygame.K_UP] or keys[pygame.K_DOWN] or keys[pygame.K_LEFT] or keys[pygame.K_RIGHT]:
+                    if not self.kickoff_started:  # Detect kickoff start
+                        print("Kickoff started by Red Team!")
+                        self.unfreeze_team("blue")  # Unfreeze blue team
+                        self.kickoff_started = True
+                if keys[pygame.K_UP]:
+                    self.players[2].move(
+                        0, -1, self.width, self.height, self.players)
+                if keys[pygame.K_DOWN]:
+                    self.players[2].move(
+                        0, 1, self.width, self.height, self.players)
+                if keys[pygame.K_LEFT]:
+                    self.players[2].move(-1, 0, self.width,
+                                         self.height, self.players)
+                if keys[pygame.K_RIGHT]:
+                    self.players[2].move(
+                        1, 0, self.width, self.height, self.players)
+            # if keys[pygame.K_m]:
+            #     self.players[2].turn(5)
+            # if keys[pygame.K_n]:
+            #     self.players[2].turn(-5)
+
+            for i, player in enumerate(self.players):
+                for j, other_player in enumerate(self.players):
+                    if i != j:
+                        player.prevent_overlap(other_player)
+
+            self.ball.move()
+            self.ball.check_collision_with_walls(self.width, self.height)
+
+            for player in self.players:
+                self.ball.check_collision_with_player(player)
+
+            self.ball.resolve_stuck_ball(self.players)
+
+            if self.check_goal():
+                continue
 
             self.draw_field()
             pygame.display.flip()
             self.clock.tick(60)
+
+    def check_goal(self):
+        # Wanna make this global
+        goal_depth = 40
+        goal_height = 100
+        goal_top = (self.height - goal_height) // 2
+        goal_bottom = goal_top + goal_height
+
+        if self.ball.x - self.ball.radius <= 20 - goal_depth:
+            if goal_top <= self.ball.y <= goal_bottom:
+                if self.ball.last_touched_by == "blue":
+                    print("Own Goal: Point for Red Team")
+                    self.red_score += 1
+                    self.reset_positions("red")
+                else:
+                    print("Goal for Red Team")
+                    self.red_score += 1
+                    self.reset_positions("blue")
+                return True
+
+        elif self.ball.x + self.ball.radius >= self.width - (20 - goal_depth):
+            if goal_top <= self.ball.y <= goal_bottom:
+                if self.ball.last_touched_by == "red":
+                    print("Own Goal: Point for Blue Team")
+                    self.blue_score += 1
+                    self.reset_positions("red")
+                else:
+                    print("Goal for Blue Team!")
+                    self.blue_score += 1
+                    self.reset_positions("blue")
+
+                return True
+
+        return False
+
+    def reset_positions(self, last_scoring_team):
+        # Bring ball to the center
+        self.ball.reset_position(self.width // 2, self.height // 2)
+
+        # Reset the players
+        # The team that scored does not start again
+        for player in self.players:
+            player.x, player.y = player.initial_position
+            if player.team == last_scoring_team:
+                player.frozen = True
+            else:
+                player.frozen = False
+
+        self.kickoff_started = False
+
+        pygame.time.delay(2000)
+
+    def draw_scores(self):
+        font = pygame.font.Font(None, 36)
+        red_score_text = font.render(f"Red Team: {self.red_score}", True, (255, 0, 0))
+        blue_score_text = font.render(f"Blue Team: {self.blue_score}", True, (0, 0, 255))
+
+        self.screen.blit(blue_score_text, (50, 10))
+        self.screen.blit(red_score_text, (self.width - 200, 10))
+
+    def unfreeze_team(self, team):
+        for player in self.players:
+            if player.team == team:
+                player.frozen = False
 
     def _draw_goal_net(self):
         goal_top = (self.height - 100) // 2
