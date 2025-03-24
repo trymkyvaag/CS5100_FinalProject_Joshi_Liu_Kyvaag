@@ -1,5 +1,6 @@
-import pygame
 import math
+
+import pygame
 
 
 class Player:
@@ -10,21 +11,23 @@ class Player:
         self.team = team
         self.angle = 0
         self.radius = 20
-        self.speed = 3
+        self.speed = 7
         self.initial_position = (x, y)
         self.frozen = False
 
     def draw(self, screen):
         # Removed direction of looking, just look in the direction of the movement (WASD for now)
-        pygame.draw.circle(screen, self.color,
-                           (int(self.x), int(self.y)), self.radius)
+        pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
 
         indicator_x = self.x + self.radius * math.cos(math.radians(self.angle))
         indicator_y = self.y - self.radius * math.sin(math.radians(self.angle))
-        pygame.draw.circle(screen, (255, 255, 255),
-                           (int(indicator_x), int(indicator_y)), 3)
+        pygame.draw.circle(
+            screen, (255, 255, 255), (int(indicator_x), int(indicator_y)), 3
+        )
 
-        pygame.draw.circle(screen, (255, 255, 255), (int(indicator_x), int(indicator_y)), 3)
+        pygame.draw.circle(
+            screen, (255, 255, 255), (int(indicator_x), int(indicator_y)), 3
+        )
 
     def move(self, dx, dy, field_width, field_height, players):
         if self.frozen:
@@ -35,10 +38,12 @@ class Player:
 
         # Changed this a bit because the ball would sometimes exactly sit on the
         # right and left wall and the player is unable to touch it.
-        if (new_x - self.radius < 10 or
-                new_x + self.radius > field_width - 10 or
-                new_y - self.radius < 0 or
-                new_y + self.radius > field_height):
+        if (
+            new_x - self.radius < 10
+            or new_x + self.radius > field_width - 10
+            or new_y - self.radius < 0
+            or new_y + self.radius > field_height
+        ):
             return
 
         for player in players:
@@ -59,7 +64,10 @@ class Player:
 
     def prevent_overlap(self, other_player):
         import math
-        distance = math.sqrt((self.x - other_player.x) ** 2 + (self.y - other_player.y) ** 2)
+
+        distance = math.sqrt(
+            (self.x - other_player.x) ** 2 + (self.y - other_player.y) ** 2
+        )
         if distance < self.radius + other_player.radius:
             # Push this player back based on their velocity
             overlap = self.radius + other_player.radius - distance

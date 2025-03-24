@@ -1,10 +1,12 @@
 import pygame
 
+
 class Ball:
     """
     The idea is to have a functioning ball that moves with its own player ball collision logic.
     More like air hockey kind of scenario.
     """
+
     def __init__(self, x, y, radius=10, color=(255, 255, 255)):
         self.x = x
         self.y = y
@@ -60,6 +62,7 @@ class Ball:
         if abs(self.velocity[0]) < 0.1 and abs(self.velocity[1]) < 0.1:
             if not (self.velocity[0] == 0 and self.velocity[1] == 0):
                 import random
+
                 self.velocity[0] += random.uniform(-1, 1) * 0.5
                 self.velocity[1] += random.uniform(-1, 1) * 0.5
 
@@ -72,12 +75,13 @@ class Ball:
     def check_collision_with_player(self, player):
         # We are bouncy after all
         import math
+
         distance = math.sqrt((self.x - player.x) ** 2 + (self.y - player.y) ** 2)
         if distance < self.radius + player.radius:
             # Collided where do I bounce
             dx = self.x - player.x
             dy = self.y - player.y
-            magnitude = math.sqrt(dx ** 2 + dy ** 2)
+            magnitude = math.sqrt(dx**2 + dy**2)
             if magnitude != 0:
                 dx /= magnitude
                 dy /= magnitude
@@ -86,12 +90,13 @@ class Ball:
             self.velocity[0] = dx * 5
             self.velocity[1] = dy * 5
 
-            # State tracker for who to start the next round
+            # State tracker for whom to start the next round
             self.last_touched_by = player.team
 
     def resolve_stuck_ball(self, players):
         for player in players:
             import math
+
             # Ball sometimes can "lay" on a player, don't do that just bounce.
             distance = math.sqrt((self.x - player.x) ** 2 + (self.y - player.y) ** 2)
             if distance < self.radius + player.radius:  # Ball is stuck inside a player
@@ -104,5 +109,6 @@ class Ball:
 
                 # Prevent infinite collisions
                 import random
+
                 self.velocity[0] += random.uniform(-1, 1)
                 self.velocity[1] += random.uniform(-1, 1)
