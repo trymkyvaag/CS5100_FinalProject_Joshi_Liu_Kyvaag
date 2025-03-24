@@ -6,7 +6,7 @@ from player import Player
 
 
 class SoccerField:
-    def __init__(self, width=600, height=400):
+    def __init__(self, width=600, height=400, game_duration=60):
         pygame.init()
         self.width = width
         self.height = height
@@ -31,6 +31,8 @@ class SoccerField:
         self.red_score = 0
         self.blue_score = 0
         self.kickoff_started = False
+        self.game_duration = game_duration
+        self.start_time = pygame.time.get_ticks()
 
     def draw_field(self):
         self.screen.fill(self.GREEN)
@@ -64,13 +66,16 @@ class SoccerField:
 
         self.ball.draw(self.screen)
         self.draw_scores()
+        self.draw_timer()
 
     def reset_game(self):
         self.ball.reset_position(self.width // 2, self.height // 2)
+        self.start_time = pygame.time.get_ticks()
 
     def run(self):
         self.reset_game()
-        while True:
+        game_over = False
+        while not game_over:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -82,9 +87,9 @@ class SoccerField:
             # Blue team controls
             if not self.players[0].frozen:
                 if keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]:
-                    if not self.kickoff_started:  # Detect kickoff start
+                    if not self.kickoff_started:
                         print("Kickoff started by Blue Team!")
-                        self.unfreeze_team("red")  # Unfreeze red team
+                        self.unfreeze_team("red")
                         self.kickoff_started = True
                 if keys[pygame.K_w]:
                     self.players[0].move(
@@ -109,21 +114,21 @@ class SoccerField:
             # Red team controls
             if not self.players[1].frozen:
                 if keys[pygame.K_UP] or keys[pygame.K_DOWN] or keys[pygame.K_LEFT] or keys[pygame.K_RIGHT]:
-                    if not self.kickoff_started:  # Detect kickoff start
+                    if not self.kickoff_started:
                         print("Kickoff started by Red Team!")
-                        self.unfreeze_team("blue")  # Unfreeze blue team
+                        self.unfreeze_team("blue")
                         self.kickoff_started = True
                 if keys[pygame.K_UP]:
-                    self.players[2].move(
+                    self.players[1].move(
                         0, -1, self.width, self.height, self.players)
                 if keys[pygame.K_DOWN]:
-                    self.players[2].move(
+                    self.players[1].move(
                         0, 1, self.width, self.height, self.players)
                 if keys[pygame.K_LEFT]:
-                    self.players[2].move(-1, 0, self.width,
+                    self.players[1].move(-1, 0, self.width,
                                          self.height, self.players)
                 if keys[pygame.K_RIGHT]:
-                    self.players[2].move(
+                    self.players[1].move(
                         1, 0, self.width, self.height, self.players)
             # if keys[pygame.K_m]:
             #     self.players[2].turn(5)
@@ -150,6 +155,10 @@ class SoccerField:
             pygame.display.flip()
             self.clock.tick(60)
 
+            if (pygame.time.get_ticks() - self.start_time) / 1000 > self.game_duration:
+                game_over = True
+                self.display_game_over()
+
     def check_goal(self):
         # Wanna make this global
         goal_depth = 40
@@ -162,11 +171,15 @@ class SoccerField:
                 if self.ball.last_touched_by == "blue":
                     print("Own Goal: Point for Red Team")
                     self.red_score += 1
-                    self.reset_positions("red")
+                    self.reset_positions()
+                    self.freeze_team("blue")
+                    self.unfreeze_team("red")
                 else:
                     print("Goal for Red Team")
                     self.red_score += 1
-                    self.reset_positions("blue")
+                    self.reset_positions()
+                    self.freeze_team("red")
+                    self.unfreeze_team("blue")
                 return True
 
         elif self.ball.x + self.ball.radius >= self.width - (20 - goal_depth):
@@ -174,30 +187,27 @@ class SoccerField:
                 if self.ball.last_touched_by == "red":
                     print("Own Goal: Point for Blue Team")
                     self.blue_score += 1
-                    self.reset_positions("red")
+                    self.reset_positions()
+                    self.freeze_team("red")
+                    self.unfreeze_team("blue")
                 else:
                     print("Goal for Blue Team!")
                     self.blue_score += 1
-                    self.reset_positions("blue")
+                    self.reset_positions()
+                    self.freeze_team("blue")
+                    self.unfreeze_team("red")
 
                 return True
 
         return False
 
-    def reset_positions(self, last_scoring_team):
+    def reset_positions(self):
         # Bring ball to the center
         self.ball.reset_position(self.width // 2, self.height // 2)
+        self.kickoff_started = False
 
-        # Reset the players
-        # The team that scored does not start again
         for player in self.players:
             player.x, player.y = player.initial_position
-            if player.team == last_scoring_team:
-                player.frozen = True
-            else:
-                player.frozen = False
-
-        self.kickoff_started = False
 
         pygame.time.delay(2000)
 
@@ -214,6 +224,11 @@ class SoccerField:
             if player.team == team:
                 player.frozen = False
 
+    def freeze_team(self, team):
+        for player in self.players:
+            if player.team == team:
+                player.frozen = True
+
     def _draw_goal_net(self):
         goal_top = (self.height - 100) // 2
         goal_depth = 40
@@ -228,6 +243,35 @@ class SoccerField:
                 pygame.draw.line(self.screen, net_color, (self.width - 20 + x, y), (self.width - 20 + x, y + net_spacing), 1)
                 pygame.draw.line(self.screen, net_color, (self.width - 20 + x, y), (self.width - 20, y), 1)
 
+    def draw_timer(self):
+        elapsed_time = (pygame.time.get_ticks() - self.start_time) / 1000
+        remaining_time = max(0, self.game_duration - elapsed_time)
+        minutes = int(remaining_time // 60)
+        seconds = int(remaining_time % 60)
+        timer_text = f"{minutes:02}:{seconds:02}"
+        font = pygame.font.Font(None, 36)
+
+        timer_render = font.render(timer_text, True, self.WHITE)
+        timer_rect = timer_render.get_rect(center=(self.width // 2, 20))
+        self.screen.blit(timer_render, timer_rect)
+
+    def display_game_over(self):
+        font = pygame.font.Font(None, 48)
+        if self.red_score > self.blue_score:
+            game_over_text = "Red Team Wins!"
+        elif self.blue_score > self.red_score:
+            game_over_text = "Blue Team Wins!"
+        else:
+            game_over_text = "It's a Tie!"
+
+        text_render = font.render(game_over_text, True, self.WHITE)
+        text_rect = text_render.get_rect(center=(self.width // 2, self.height // 2))
+        self.screen.blit(text_render, text_rect)
+
+        pygame.display.update()
+        pygame.time.delay(3000)
+        pygame.quit()
+        sys.exit()
 
 if __name__ == "__main__":
     field = SoccerField()
