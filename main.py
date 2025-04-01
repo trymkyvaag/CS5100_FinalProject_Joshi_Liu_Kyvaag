@@ -9,6 +9,42 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 import rewards.heuristic
 from Visual_Components.field import SoccerField
 
+from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.monitor import Monitor
+
+
+
+class RewardCallback(BaseCallback):
+
+    def __init__(self, verbose = 0):
+        super().__init__(verbose)
+        self.episodic_reward_list = []
+
+    def _on_step(self) -> bool:
+        for info in self.locals.get("infos", []):
+            if "episode" in info:
+                episode_reward = info["episode"]["r"]
+                self.episodic_reward_list.append(episode_reward)
+
+                minimum_reward = np.min(self.episodic_reward_list)
+                maximum_reward = np.max(self.episodic_reward_list)
+                average_reward = np.mean(self.episodic_reward_list)
+
+                print(f"Episode: {len(self.episodic_reward_list)}\n"
+                      f"Reward : {episode_reward:f}\n"
+                      f"Min    : {minimum_reward:.4f}\n"
+                      f"Max    : {maximum_reward:.4f}\n"
+                      f"Avg    : {average_reward:.4f}")
+
+
+        return True
+
+
+
+
+
+
+
 
 class SoccerFieldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
@@ -234,10 +270,18 @@ if __name__ == "__main__":
     )
     dummy_env = SoccerFieldEnv(render_mode="rgb_array", game_duration=30)
 
-    env = DummyVecEnv([lambda: dummy_env])
+    #check if i need this tomorrow morning
+    monitored_env = Monitor(dummy_env)
+
+
+    # env = DummyVecEnv([lambda: dummy_env])
+    env = DummyVecEnv([lambda: monitored_env])
+
+    #pooping time
+    reward_callback = RewardCallback()
 
     model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.00003)
-    model.learn(total_timesteps=1000000, callback=checkpoint_callback)
+    model.learn(total_timesteps=1000000, callback=[checkpoint_callback, reward_callback])
 
     model.save("soccer_agent_ppo")
 
