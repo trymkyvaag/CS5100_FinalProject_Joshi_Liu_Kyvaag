@@ -6,7 +6,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-import rewards.heuristic
+import rewards.heuristic2
 from Visual_Components.field import SoccerField
 
 
@@ -70,7 +70,8 @@ class SoccerFieldEnv(gym.Env):
             dtype=np.float32,
         )
 
-        self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
+        self.observation_space = spaces.Box(
+            low=low, high=high, dtype=np.float32)
 
         pygame.init()
         self.render_mode = render_mode
@@ -187,14 +188,15 @@ class SoccerFieldEnv(gym.Env):
         self.soccer_field.check_player_ball_overlaps()
 
     def _calculate_reward(self):
-        return rewards.heuristic.reward_function(self)
+        return rewards.heuristic2.reward_function(self)
         # return rewards.checkpoint.reward_function(self)
 
     def _is_done(self):
         return self.soccer_field.check_goal()[0]
 
     def _is_truncated(self):
-        elapsed_time = (pygame.time.get_ticks() - self.soccer_field.start_time) / 1000
+        elapsed_time = (pygame.time.get_ticks() -
+                        self.soccer_field.start_time) / 1000
         return elapsed_time > self.game_duration
 
     def _render_frame(self):
@@ -236,7 +238,7 @@ if __name__ == "__main__":
 
     env = DummyVecEnv([lambda: dummy_env])
 
-    model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.00003)
+    model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.00005)
     model.learn(total_timesteps=1000000, callback=checkpoint_callback)
 
     model.save("soccer_agent_ppo")

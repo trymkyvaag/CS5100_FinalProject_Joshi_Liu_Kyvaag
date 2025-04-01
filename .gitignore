@@ -1,1 +1,5 @@
 .venv
+myenv
+__pycache__
+reward_logs
+*/__pycache__
