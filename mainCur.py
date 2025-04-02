@@ -233,7 +233,7 @@ class SoccerFieldEnv(gym.Env):
         """Simple AI for red players that move towards the ball"""
         player = self.players[player_index]
         if player.disabled or player.frozen:
-            return
+            return 
 
         # Simple AI: move towards the ball
         dx = self.ball.x - player.x
@@ -333,7 +333,7 @@ if __name__ == "__main__":
         },
         {
             'name': 'Stage 2 - Two attackers vs one stationary defender',
-            'timestep': 200000,
+            'timestep': 50000,
             'blue_player_1_disabled': False,
             'blue_player_2_disabled': False,  # One attacker stationnary
             'red_player_1_disabled': False,
@@ -341,40 +341,40 @@ if __name__ == "__main__":
             'red_player_1_moving': False,
             'red_player_2_moving': False
         },
-        {
-            'name': 'Stage 3 - Two attackers vs one moving defender',
-            'timestep': 400000,
-            'blue_player_1_disabled': False,
-            'blue_player_2_disabled': False,  # One active
-            'red_player_1_disabled': False,
-            'red_player_2_disabled': True,
-            'red_player_1_moving': True,
-            'red_player_2_moving': False
-        },
-        {
-            'name': 'Stage 4 - Two attackers vs two defenders (one moving)',
-            'timestep': 600000,
-            'blue_player_1_disabled': False,
-            'blue_player_2_disabled': False,  # Both def stationary
-            'red_player_1_disabled': False,
-            'red_player_2_disabled': False,
-            'red_player_1_moving': True,
-            'red_player_2_moving': False
-        },
-        {
-            'name': 'Stage 5 - Two attackers vs two moving defenders',
-            'timestep': 800000,
-            'blue_player_1_disabled': False,
-            'blue_player_2_disabled': False,  # Both def active
-            'red_player_1_disabled': False,
-            'red_player_2_disabled': False,
-            'red_player_1_moving': True,
-            'red_player_2_moving': True
-        }
+        # {
+        #     'name': 'Stage 3 - Two attackers vs one moving defender',
+        #     'timestep': 200000,
+        #     'blue_player_1_disabled': False,
+        #     'blue_player_2_disabled': False,  # One active
+        #     'red_player_1_disabled': False,
+        #     'red_player_2_disabled': True,
+        #     'red_player_1_moving': True,
+        #     'red_player_2_moving': False
+        # },
+        # {
+        #     'name': 'Stage 4 - Two attackers vs two defenders (not moving)',
+        #     'timestep': 400000,
+        #     'blue_player_1_disabled': False,
+        #     'blue_player_2_disabled': False,  # Both def stationary
+        #     'red_player_1_disabled': False,
+        #     'red_player_2_disabled': False,
+        #     'red_player_1_moving': True,
+        #     'red_player_2_moving': False
+        # },
+        # {
+        #     'name': 'Stage 5 - Two attackers vs two moving defenders',
+        #     'timestep': 800000,
+        #     'blue_player_1_disabled': False,
+        #     'blue_player_2_disabled': False,  # Both def active
+        #     'red_player_1_disabled': False,
+        #     'red_player_2_disabled': False,
+        #     'red_player_1_moving': True,
+        #     'red_player_2_moving': True
+        # }
     ]
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=100000,
+        save_freq=50000,
         save_path="./model_checkpoints/currLearn/",
         name_prefix="soccer_model",
         save_replay_buffer=True,
@@ -399,7 +399,7 @@ if __name__ == "__main__":
     model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.00003)
     
     
-    model.learn(total_timesteps=1000000, callback=callbacks)
+    model.learn(total_timesteps=100000, callback=callbacks)
 
     model.save("soccer_agent_curriculum_ppo")
 

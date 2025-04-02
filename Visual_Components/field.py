@@ -70,7 +70,8 @@ class SoccerField:
 
         self._draw_goal_net()
         for idx, player in enumerate(self.players):
-            player.draw(self.screen)
+            if not player.disabled:
+                player.draw(self.screen)
 
         self.ball.draw(self.screen)
         self.draw_scores()
