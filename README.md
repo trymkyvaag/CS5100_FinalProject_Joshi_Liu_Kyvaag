@@ -9,14 +9,15 @@ Final Project for CS5100 FAI
 1. Checkout the code.
 2. Shift to branch 7-git-ignore-readme-requirements
 3. Make sure python3 is installed, latest is better
-4. We recommend a venv `python3 -m venv .venv`
-5. Install requirements `pip -r requirements.txt`
+4. We recommend a venv `python3 -m venv .venv` and run `source .venv/bin/activate`
+5. Install requirements `pip install -r requirements.txt`
 6. To see live training set in main.py line 354 render_mode='human' else just run `python3 main.py` (we will use args
-   later for this)
+   later for this) otherwise skip to point 9.
 7. Once training is done model_checkpoints is populated with checkpoints for 100k timesteps each, a final model named
    soccer_agent_ppo.zip would be saved in the root directory of this project as well.
 8. During training a live graph and rewards csv would be populated in reward_logs directory.
-9. To replay with a trained model run `python3 replay.py` by setting the model you want to use in line 8 of replay.py
+9. To replay with a trained model run `python3 replay.py` by setting the model you want to use in line 8 of replay.py,
+   by default we have the final trained model set
 
 ## Important note
 
