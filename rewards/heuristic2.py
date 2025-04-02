@@ -131,7 +131,7 @@ def reward_function(self):
         position_multiplier = (self.ball.x / self.width) ** 2
         reward += 0.7 * (1 + position_multiplier)  # Increased from 0.5
 
-    # Reward red for being positioned between the ball and blue's goal
+    # NEW: Reward red for being positioned between the ball and blue's goal
     # This encourages defensive positioning and intercepting the ball path
     for red_player in [red1, red2]:
         # Vector from ball to goal
@@ -154,7 +154,7 @@ def reward_function(self):
             # Penalize blue (reward red) for good defensive positioning
             reward -= 0.4 * in_front_factor
     
-    # Reward red for moving toward the ball (trying to gain possession)
+    # NEW: Reward red for moving toward the ball (trying to gain possession)
     if hasattr(self, "prev_positions"):
         for idx, red_player in enumerate([red1, red2]):
             player_key = f"red{idx+1}"
@@ -172,7 +172,7 @@ def reward_function(self):
                 reward -= 0.3 * distance_improvement  # Penalize blue (reward red)
 
     if hasattr(self, "prev_positions"):
-        # 7. Player Movement and Interception - MODIFIED as well
+        # 7. Player Movement and Interception - MODIFIED to be more balanced
         red1_speed = np.sqrt(
             (red1.x - self.prev_positions["red1"][0]) ** 2
             + (red1.y - self.prev_positions["red1"][1]) ** 2
@@ -187,8 +187,10 @@ def reward_function(self):
         red2_intercept_angle = np.arctan2(
             self.ball.y - red2.y, self.ball.x - red2.x)
 
-        
-        # Reward red for moving toward the ball MOD
+        # REMOVED the penalty for red being stagnant - this was causing issues
+        # Now we'll only reward meaningful movement
+
+        # Reward red for moving toward the ball (improved interception)
         if red1_speed > 0.1:
             red1_movement_angle = np.arctan2(
                 red1.y - self.prev_positions["red1"][1],
@@ -201,6 +203,7 @@ def reward_function(self):
                 )
                 / np.pi
             )
+            # Better reward for red moving toward ball
             reward -= 0.3 * (1 - red1_angle_diff)  # Increased from 0.2
 
         if red2_speed > 0.1:
@@ -218,7 +221,7 @@ def reward_function(self):
             # Better reward for red moving toward ball
             reward -= 0.3 * (1 - red2_angle_diff)  # Increased from 0.2
     
-    # Add penalty for red players hanging out in corners
+    # NEW: Add penalty for red players hanging out in corners
     corner_penalty = 0.0
     corners = [(0,0), (0,self.height), (self.width,0), (self.width,self.height)]
     for red_player in [red1, red2]:

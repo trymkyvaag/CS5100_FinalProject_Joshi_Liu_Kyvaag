@@ -5,7 +5,7 @@ from main import SoccerFieldEnv
 
 env = DummyVecEnv([lambda: SoccerFieldEnv(render_mode="human")])
 
-model_path = "model_checkpoints/depthModelClipRange.zip"
+model_path = "model_checkpoints/soccer_model_1000000_steps.zip"
 model = PPO.load(model_path, env=env)
 
 obs = env.reset()
