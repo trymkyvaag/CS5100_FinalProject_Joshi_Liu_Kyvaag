@@ -179,7 +179,7 @@ class SoccerFieldEnv(gym.Env):
                 player.move(0, -1, self.width, self.height, self.players)
             elif action == 1:  # backward
                 player.move(0, 1, self.width, self.height, self.players)
-            elif action == 2:  # left
+            elif action == 2:  # leftxa
                 player.move(-1, 0, self.width, self.height, self.players)
             elif action == 3:  # right
                 player.move(1, 0, self.width, self.height, self.players)

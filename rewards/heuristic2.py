@@ -56,13 +56,9 @@ def reward_function(self):
 
     # 3. Ball Possession
     blue_possession = False
-    red_possession = False
     if blue1_ball_dist < blue1.radius * 1.5 or blue2_ball_dist < blue2.radius * 1.5:
         blue_possession = True
         reward += 0.5
-    if red1_ball_dist < red1.radius * 1.5 or red2_ball_dist < red2.radius * 1.5:
-        red_possession = True
-        reward -= 0.5  # Penalty for blue when red has possession
 
     # 4. Ball Movement Direction
     ball_velocity_angle = np.arctan2(
@@ -131,48 +127,8 @@ def reward_function(self):
         position_multiplier = (self.ball.x / self.width) ** 2
         reward += 0.7 * (1 + position_multiplier)  # Increased from 0.5
 
-    # NEW: Reward red for being positioned between the ball and blue's goal
-    # This encourages defensive positioning and intercepting the ball path
-    for red_player in [red1, red2]:
-        # Vector from ball to goal
-        ball_to_goal_vector = [opponent_goal_x - self.ball.x, opponent_goal_y - self.ball.y]
-        ball_to_goal_dist = np.sqrt(ball_to_goal_vector[0]**2 + ball_to_goal_vector[1]**2)
-        
-        # Vector from ball to red player
-        ball_to_red_vector = [red_player.x - self.ball.x, red_player.y - self.ball.y]
-        ball_to_red_dist = np.sqrt(ball_to_red_vector[0]**2 + ball_to_red_vector[1]**2)
-        
-        # Dot product to see if red is in front of ball toward blue's goal
-        if ball_to_goal_dist > 0:  # Avoid division by zero
-            dot_product = (ball_to_red_vector[0] * ball_to_goal_vector[0] + 
-                          ball_to_red_vector[1] * ball_to_goal_vector[1]) / ball_to_goal_dist
-            
-            # Normalize to get a value between 0 and 1
-            # Higher value means red is more directly in front of the ball toward goal
-            in_front_factor = max(0, min(dot_product / ball_to_goal_dist, 1))
-            
-            # Penalize blue (reward red) for good defensive positioning
-            reward -= 0.4 * in_front_factor
-    
-    # NEW: Reward red for moving toward the ball (trying to gain possession)
     if hasattr(self, "prev_positions"):
-        for idx, red_player in enumerate([red1, red2]):
-            player_key = f"red{idx+1}"
-            prev_dist = np.sqrt(
-                (self.prev_positions[player_key][0] - self.prev_positions["ball"][0])**2 +
-                (self.prev_positions[player_key][1] - self.prev_positions["ball"][1])**2
-            )
-            current_dist = np.sqrt(
-                (red_player.x - self.ball.x)**2 + (red_player.y - self.ball.y)**2
-            )
-            
-            # If red is moving closer to the ball
-            if current_dist < prev_dist:
-                distance_improvement = (prev_dist - current_dist) / field_diagonal
-                reward -= 0.3 * distance_improvement  # Penalize blue (reward red)
-
-    if hasattr(self, "prev_positions"):
-        # 7. Player Movement and Interception - MODIFIED to be more balanced
+        # 7. Player Movement and Interception
         red1_speed = np.sqrt(
             (red1.x - self.prev_positions["red1"][0]) ** 2
             + (red1.y - self.prev_positions["red1"][1]) ** 2
@@ -187,10 +143,13 @@ def reward_function(self):
         red2_intercept_angle = np.arctan2(
             self.ball.y - red2.y, self.ball.x - red2.x)
 
-        # REMOVED the penalty for red being stagnant - this was causing issues
-        # Now we'll only reward meaningful movement
+        # try intercepting if red is stagnant.
+        if red1_speed < 0.1 and red1_ball_dist > red1.radius * 3:
+            reward -= 0.1
+        if red2_speed < 0.1 and red2_ball_dist > red2.radius * 3:
+            reward -= 0.1
 
-        # Reward red for moving toward the ball (improved interception)
+        # if red can intercept then negatively reward blue
         if red1_speed > 0.1:
             red1_movement_angle = np.arctan2(
                 red1.y - self.prev_positions["red1"][1],
@@ -199,12 +158,12 @@ def reward_function(self):
             red1_angle_diff = (
                 min(
                     abs(red1_intercept_angle - red1_movement_angle),
-                    2 * np.pi - abs(red1_intercept_angle - red1_movement_angle),
+                    2 * np.pi - abs(red1_intercept_angle -
+                                    red1_movement_angle),
                 )
                 / np.pi
             )
-            # Better reward for red moving toward ball
-            reward -= 0.3 * (1 - red1_angle_diff)  # Increased from 0.2
+            reward -= 0.2 * (1 - red1_angle_diff)
 
         if red2_speed > 0.1:
             red2_movement_angle = np.arctan2(
@@ -214,22 +173,12 @@ def reward_function(self):
             red2_angle_diff = (
                 min(
                     abs(red2_intercept_angle - red2_movement_angle),
-                    2 * np.pi - abs(red2_intercept_angle - red2_movement_angle),
+                    2 * np.pi - abs(red2_intercept_angle -
+                                    red2_movement_angle),
                 )
                 / np.pi
             )
-            # Better reward for red moving toward ball
-            reward -= 0.3 * (1 - red2_angle_diff)  # Increased from 0.2
-    
-    # NEW: Add penalty for red players hanging out in corners
-    corner_penalty = 0.0
-    corners = [(0,0), (0,self.height), (self.width,0), (self.width,self.height)]
-    for red_player in [red1, red2]:
-        min_corner_dist = min([np.sqrt((red_player.x - cx)**2 + (red_player.y - cy)**2) for cx, cy in corners])
-        corner_proximity = 1.0 - min(min_corner_dist / (self.width/5), 1.0)  # Normalize
-        if corner_proximity > 0.7:  # Only penalize when very close to corners
-            corner_penalty += 0.7 * corner_proximity
-    reward += corner_penalty  # Positive for blue (penalty for red)
+            reward -= 0.2 * (1 - red2_angle_diff)
 
     # 8. Defensive Positioning for blue team, encourage them closer to each other.
     blue_to_own_goal = min(
@@ -244,14 +193,15 @@ def reward_function(self):
     if not blue_possession:
         front_player_x = max(blue1.x, blue2.x)
         back_player_x = min(blue1.x, blue2.x)
-        field_coverage = (front_player_x - back_player_x) / self.width  
+        field_coverage = (front_player_x - back_player_x) / \
+            self.width  
 
         if field_coverage < 0.3:
             reward += 0.4 * field_coverage
         else:
             reward -= 1  # make sure they do not go tooo far
 
-    # Track ball possession changes
+        # Track ball possession changes
     if hasattr(self, "prev_possession"):
         # If ball was previously not possessed by blue but now is by the other blue player
         if not self.prev_possession and blue_possession:

@@ -14,6 +14,7 @@ class Player:
         self.speed = 7
         self.initial_position = (x, y)
         self.frozen = False
+        self.disabled = False
 
     def draw(self, screen):
         # Removed direction of looking, just look in the direction of the movement (WASD for now)
