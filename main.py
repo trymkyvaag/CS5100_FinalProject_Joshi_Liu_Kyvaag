@@ -238,7 +238,7 @@ if __name__ == "__main__":
 
     env = DummyVecEnv([lambda: dummy_env])
 
-    model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.00005)
+    model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.00003)
     model.learn(total_timesteps=1000000, callback=checkpoint_callback)
 
     model.save("soccer_agent_ppo")

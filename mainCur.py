@@ -233,7 +233,7 @@ class SoccerFieldEnv(gym.Env):
         """Simple AI for red players that move towards the ball"""
         player = self.players[player_index]
         if player.disabled or player.frozen:
-            return 
+            return
 
         # Simple AI: move towards the ball
         dx = self.ball.x - player.x
@@ -317,6 +317,20 @@ class SoccerFieldEnv(gym.Env):
             pygame.display.quit()
             pygame.quit()
 
+    def disable_red_players(self):
+        """Actually remove red players fr om the field"""
+        # Option 1: Move them far off the field
+        if hasattr(self, 'players') and len(self.players) >= 4:
+            # Move red players far outside the field
+            self.players[2].x = -1000  # Red player 1
+            self.players[2].y = -1000
+            self.players[3].x = -1000  # Red player 2
+            self.players[3].y = -1000
+
+            # Set velocity to zero
+            self.players[2].velocity = [0, 0]
+            self.players[3].velocity = [0, 0]
+
 
 if __name__ == "__main__":
     # Define curriculum stages based on timesteps - always with two attackers
@@ -333,7 +347,7 @@ if __name__ == "__main__":
         },
         {
             'name': 'Stage 2 - Two attackers vs one stationary defender',
-            'timestep': 50000,
+            'timestep': 100000,
             'blue_player_1_disabled': False,
             'blue_player_2_disabled': False,  # One attacker stationnary
             'red_player_1_disabled': False,
@@ -353,7 +367,7 @@ if __name__ == "__main__":
         # },
         # {
         #     'name': 'Stage 4 - Two attackers vs two defenders (not moving)',
-        #     'timestep': 400000,
+        #     'timestep': 600000,
         #     'blue_player_1_disabled': False,
         #     'blue_player_2_disabled': False,  # Both def stationary
         #     'red_player_1_disabled': False,
@@ -397,9 +411,8 @@ if __name__ == "__main__":
     callbacks = CallbackList([checkpoint_callback, curriculum_callback])
 
     model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.00003)
-    
-    
-    model.learn(total_timesteps=100000, callback=callbacks)
+
+    model.learn(total_timesteps=300000, callback=callbacks)
 
     model.save("soccer_agent_curriculum_ppo")
 
