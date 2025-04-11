@@ -1,7 +1,6 @@
 import os
 
 import gymnasium as gym
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pygame
@@ -9,7 +8,9 @@ from gymnasium import Wrapper
 from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 import rewards.heuristic
 from Visual_Components.field import SoccerField
@@ -73,11 +74,21 @@ class RewardTracker(Wrapper):
 
 
 class RewardLoggingCallback(BaseCallback):
-    def __init__(self, reward_tracker, log_dir="./reward_logs/", verbose=0):
+    def __init__(
+        self,
+        reward_tracker,
+        eval_env=None,
+        log_dir="./reward_logs/",
+        eval_freq=50000,
+        verbose=0,
+    ):
         super(RewardLoggingCallback, self).__init__(verbose)
         self.reward_tracker = reward_tracker
+        self.eval_env = eval_env
         self.log_dir = log_dir
+        self.eval_freq = eval_freq
         self.stats_history = []
+        self._last_eval_step = 0
         os.makedirs(log_dir, exist_ok=True)
 
     def _on_step(self):
@@ -86,6 +97,31 @@ class RewardLoggingCallback(BaseCallback):
     def _on_rollout_end(self):
         stats = self.reward_tracker.get_stats()
         stats["timesteps"] = self.num_timesteps
+
+        metrics_to_track = [
+            "train/approx_kl",
+            "train/clip_fraction",
+            "train/entropy_loss",
+            "train/value_loss",
+            "train/policy_gradient_loss",
+            "train/loss",
+            "train/explained_variance",
+            "train/learning_rate",
+        ]
+
+        for key in metrics_to_track:
+            value = self.logger.name_to_value.get(key)
+            if value is not None:
+                stats[key] = value
+
+        if (
+            self.eval_env is not None
+            and (self.num_timesteps - self._last_eval_step) >= self.eval_freq
+        ):
+            eval_mean, eval_std = self._evaluate_model()
+            stats["eval_mean_reward"] = eval_mean
+            stats["eval_std_reward"] = eval_std
+            self._last_eval_step = self.num_timesteps
         self.stats_history.append(stats)
 
         if len(self.stats_history) % 10 == 0:
@@ -94,40 +130,19 @@ class RewardLoggingCallback(BaseCallback):
     def _save_stats(self):
         df = pd.DataFrame(self.stats_history)
         df.to_csv(os.path.join(self.log_dir, "reward_stats.csv"), index=False)
-        self._create_plots()
 
-    def _create_plots(self):
-        if not self.stats_history:
-            return
+    def _evaluate_model(self):
+        if self.eval_env is None:
+            return None, None
 
-        df = pd.DataFrame(self.stats_history)
-
-        plt.figure(figsize=(20, 8))
-        plt.subplot(1, 2, 1)
-        plt.plot(df["timesteps"], df["mean_reward"], label="Mean Reward")
-        if "last_100_mean_reward" in df.columns:
-            plt.plot(
-                df["timesteps"],
-                df["last_100_mean_reward"],
-                label="Last 100 Episodes Mean",
-            )
-        plt.xlabel("Timesteps")
-        plt.ylabel("Reward")
-        plt.title("Reward vs Timesteps")
-        plt.legend()
-
-        plt.subplot(1, 2, 2)
-        plt.plot(df["timesteps"], df["min_reward"], label="Min")
-        plt.plot(df["timesteps"], df["max_reward"], label="Max")
-        plt.plot(df["timesteps"], df["median_reward"], label="Median")
-        plt.xlabel("Timesteps")
-        plt.ylabel("Reward")
-        plt.title("Min/Max/Median Reward vs Timesteps")
-        plt.legend()
-
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.log_dir, "reward_plots.png"))
-        plt.close()
+        mean_reward, std_reward = evaluate_policy(
+            self.model,
+            self.eval_env,
+            n_eval_episodes=5,
+            render=False,
+            deterministic=True,
+        )
+        return mean_reward, std_reward
 
     def on_training_end(self):
         self._save_stats()
@@ -210,7 +225,21 @@ class SoccerFieldEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
+
         self.soccer_field.reset_positions()
+
+        # Randomize player positions
+        for player in self.players:
+            if player.team == "blue":
+                x_min, x_max = 50, self.width // 2 - 50
+            else:
+                x_min, x_max = self.width // 2 + 50, self.width - 50
+
+            y_min, y_max = 50, self.height - 50
+
+            player.x = self.np_random.uniform(x_min, x_max)
+            player.y = self.np_random.uniform(y_min, y_max)
+
         self.ball = self.soccer_field.ball
         self.players = self.soccer_field.players
 
@@ -355,40 +384,55 @@ if __name__ == "__main__":
         save_replay_buffer=True,
         save_vecnormalize=True,
     )
-    dummy_env = SoccerFieldEnv(render_mode="rgb_array", game_duration=60)
-    dummy_env.reset(seed=SEED)
-    tracked_env = RewardTracker(dummy_env)
 
-    env = DummyVecEnv([lambda: tracked_env])
+    def make_train_env():
+        base_env = Monitor(SoccerFieldEnv(render_mode="rgb_array", game_duration=30))
+        return RewardTracker(base_env)
+
+    env = DummyVecEnv([make_train_env])
+    env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_reward=10.0)
     env.seed(SEED)
+
+    def make_eval_env():
+        return Monitor(SoccerFieldEnv(render_mode="rgb_array", game_duration=30))
+
+    eval_env = DummyVecEnv([make_eval_env])
+    eval_env = VecNormalize(eval_env, training=False, norm_obs=True, norm_reward=True)
+
+    eval_env.obs_rms = env.obs_rms
+    eval_env.ret_rms = env.ret_rms
+
     reward_logging_callback = RewardLoggingCallback(
-        tracked_env, log_dir="./reward_logs/"
+        reward_tracker=env.venv.envs[0],
+        eval_env=eval_env,
+        log_dir="./reward_logs/",
+        eval_freq=50000,
     )
 
-    # optuna
+    policy_kwargs = dict(net_arch=[dict(pi=[64, 64], vf=[128, 128, 64])])
+
     model = PPO(
         "MlpPolicy",
         env,
         seed=SEED,
         verbose=1,
+        policy_kwargs=policy_kwargs,
         learning_rate=9.374410314646429e-05,
         n_steps=3296,
-        gamma=0.9708197855085876,
-        gae_lambda=0.9464920978639838,
+        gamma=0.99,
+        gae_lambda=0.98,
         ent_coef=0.010549674409905044,
         clip_range=0.3941564070073835,
         batch_size=3296,
-    )
-    model.learn(
-        total_timesteps=1000000, callback=[checkpoint_callback, reward_logging_callback]
+        vf_coef=0.3,
     )
 
-    # default params
-    # model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.00003)
-    # model.learn(
-    #     total_timesteps=1000000, callback=[checkpoint_callback, reward_logging_callback]
-    # )
+    model.learn(
+        total_timesteps=1_000_000,
+        callback=[checkpoint_callback, reward_logging_callback],
+    )
 
     model.save("soccer_agent_ppo")
+    env.save("vec_normalize.pkl")
 
     env.close()
