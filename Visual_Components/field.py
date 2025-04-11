@@ -22,15 +22,16 @@ class SoccerField:
 
         self.players = [
             Player(150, 200, self.BLUE, "blue"),
-            # Player(250, 150, self.BLUE, 'blue'),
+            Player(250, 150, self.BLUE, "blue"),
             Player(450, 250, self.RED, "red"),
-            # Player(550, 200, self.RED, 'red')
+            Player(550, 200, self.RED, "red"),
         ]
 
         self.clock = pygame.time.Clock()
         self.ball = Ball(width // 2, height // 2)
         self.red_score = 0
         self.blue_score = 0
+        self.scoring_team = None
         self.kickoff_started = False
         self.game_duration = game_duration
         self.start_time = pygame.time.get_ticks()
@@ -135,7 +136,7 @@ class SoccerField:
 
             self.check_player_ball_overlaps()
 
-            if self.check_goal():
+            if self.check_goal()[0]:
                 continue
 
             self.draw_field()
@@ -162,28 +163,29 @@ class SoccerField:
 
     def check_goal(self):
         # We want to make this global
-        goal_depth = 40
         goal_height = 100
         goal_top = (self.height - goal_height) // 2
         goal_bottom = goal_top + goal_height
 
-        if self.ball.x - self.ball.radius <= 20 - goal_depth:
+        if self.ball.x - self.ball.radius <= 20:
             if goal_top <= self.ball.y <= goal_bottom:
                 if self.ball.last_touched_by == "blue":
                     print("Own Goal: Point for Red Team")
                     self.red_score += 1
                     self.reset_positions()
+                    self.reset_positions()
                     self.freeze_team("blue")
                     self.unfreeze_team("red")
+                    return [True, "Blue: Own Goal"]
                 else:
                     print("Goal for Red Team")
                     self.red_score += 1
                     self.reset_positions()
                     self.freeze_team("red")
                     self.unfreeze_team("blue")
-                return True
+                    return [True, "Red: Goal"]
 
-        elif self.ball.x + self.ball.radius >= self.width - (20 - goal_depth):
+        elif self.ball.x + self.ball.radius >= self.width - 20:
             if goal_top <= self.ball.y <= goal_bottom:
                 if self.ball.last_touched_by == "red":
                     print("Own Goal: Point for Blue Team")
@@ -191,16 +193,15 @@ class SoccerField:
                     self.reset_positions()
                     self.freeze_team("red")
                     self.unfreeze_team("blue")
+                    return [True, "Red: Own Goal"]
                 else:
                     print("Goal for Blue Team!")
                     self.blue_score += 1
                     self.reset_positions()
                     self.freeze_team("blue")
                     self.unfreeze_team("red")
-
-                return True
-
-        return False
+                    return [True, "Blue: Goal"]
+        return [False, ""]
 
     def reset_positions(self):
         # Bring ball to the center

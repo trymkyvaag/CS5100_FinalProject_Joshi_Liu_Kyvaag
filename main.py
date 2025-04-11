@@ -3,17 +3,20 @@ import numpy as np
 import pygame
 from gymnasium import spaces
 from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
+import rewards.heuristic
 from Visual_Components.field import SoccerField
 
 
 class SoccerFieldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
 
-    def __init__(self, game_duration=60, render_mode=None):
+    def __init__(self, game_duration=30, render_mode=None):
         super(SoccerFieldEnv, self).__init__()
 
+        self.scoring_team = None
         self.soccer_field = SoccerField(game_duration=game_duration)
         self.width = self.soccer_field.width
         self.height = self.soccer_field.height
@@ -23,14 +26,18 @@ class SoccerFieldEnv(gym.Env):
         self.screen = self.soccer_field.screen
         self.clock = self.soccer_field.clock
 
-        self.action_space = spaces.Discrete(5)
+        self.action_space = spaces.MultiDiscrete([5, 5, 5, 5])
 
         low = np.array(
             [
-                0,  # Player 1 X
-                0,  # Player 1 Y
-                0,  # Player 2 X
-                0,  # Player 2 Y
+                0,  # Player 1 blue X
+                0,  # Player 1 blue Y
+                0,  # Player 2 blue X
+                0,  # Player 2 blue Y
+                0,  # Player 3 red X
+                0,  # Player 3 red Y
+                0,  # Player 4 red X
+                0,  # Player 4 red Y
                 0,  # Ball X
                 0,  # Ball Y
                 -6,  # Ball X Velocity
@@ -44,10 +51,14 @@ class SoccerFieldEnv(gym.Env):
 
         high = np.array(
             [
-                self.width,  # Player 1 X
-                self.height,  # Player 1 Y
-                self.width,  # Player 2 X
-                self.height,  # Player 2 Y
+                self.width,  # Player 1 blue X
+                self.height,  # Player 1 blue Y
+                self.width,  # Player 2 blue X
+                self.height,  # Player 2 blue Y
+                self.width,  # Player 3 red X
+                self.height,  # Player 3 red Y
+                self.width,  # Player 4 red X
+                self.height,  # Player 4 red Y
                 self.width,  # Ball X
                 self.height,  # Ball Y
                 6,  # Ball X Velocity
@@ -92,18 +103,24 @@ class SoccerFieldEnv(gym.Env):
         return observation, info
 
     def _get_observation(self):
-        player_blue = self.players[0]
-        player_red = self.players[1]
+        player_blue_1 = self.players[0]
+        player_blue_2 = self.players[1]
+        player_red_1 = self.players[2]
+        player_red_2 = self.players[3]
         remaining_time = (
             self.soccer_field.game_duration
             - (pygame.time.get_ticks() - self.soccer_field.start_time) / 1000
         )
         observation = np.array(
             [
-                player_blue.x,
-                player_blue.y,
-                player_red.x,
-                player_red.y,
+                player_blue_1.x,
+                player_blue_1.y,
+                player_blue_2.x,
+                player_blue_2.y,
+                player_red_1.x,
+                player_red_1.y,
+                player_red_2.x,
+                player_red_2.y,
                 self.ball.x,
                 self.ball.y,
                 self.ball.velocity[0],
@@ -117,7 +134,17 @@ class SoccerFieldEnv(gym.Env):
         return observation
 
     def step(self, action):
-        self._take_action(action)
+        (
+            action_agent_blue_1,
+            action_agent_blue_2,
+            action_agent_red_1,
+            action_agent_red_2,
+        ) = action
+
+        self._take_action(action_agent_blue_1, 0)
+        self._take_action(action_agent_blue_2, 1)
+        self._take_action(action_agent_red_1, 2)
+        self._take_action(action_agent_red_2, 3)
 
         self._update_game_state()
 
@@ -134,12 +161,19 @@ class SoccerFieldEnv(gym.Env):
 
         return observation, reward, terminated, truncated, info
 
-    def _take_action(self, action):
-        player = self.players[0]
+    def _take_action(self, action, player_index):
+
+        player = self.players[player_index]
         if not player.frozen:
             if not self.soccer_field.kickoff_started:
-                self.soccer_field.unfreeze_team("red")
                 self.soccer_field.kickoff_started = True
+                if self.scoring_team is None:
+                    self.soccer_field.unfreeze_team("red")
+                    self.soccer_field.unfreeze_team("blue")
+                else:
+                    self.soccer_field.unfreeze_team(self.scoring_team)
+                self.scoring_team = None
+
             if action == 0:  # forward
                 player.move(0, -1, self.width, self.height, self.players)
             elif action == 1:  # backward
@@ -151,26 +185,13 @@ class SoccerFieldEnv(gym.Env):
 
     def _update_game_state(self):
         self.soccer_field.check_player_ball_overlaps()
-        self.soccer_field.check_goal()
 
     def _calculate_reward(self):
-        if self.soccer_field.check_goal():
-            if self.ball.last_touched_by == "blue":
-                reward = 1
-            else:
-                reward = -1
-        else:
-            player = self.players[0]
-            distance = np.sqrt(
-                (player.x - self.ball.x) ** 2 + (player.y - self.ball.y) ** 2
-            )
-            reward = -distance / 1000
-        reward -= 0.001
-
-        return reward
+        return rewards.heuristic.reward_function(self)
+        # return rewards.checkpoint.reward_function(self)
 
     def _is_done(self):
-        return self.soccer_field.check_goal()
+        return self.soccer_field.check_goal()[0]
 
     def _is_truncated(self):
         elapsed_time = (pygame.time.get_ticks() - self.soccer_field.start_time) / 1000
@@ -204,12 +225,19 @@ class SoccerFieldEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    dummy_env = SoccerFieldEnv(render_mode="human", game_duration=30)
+    checkpoint_callback = CheckpointCallback(
+        save_freq=100000,
+        save_path="./model_checkpoints/",
+        name_prefix="soccer_model",
+        save_replay_buffer=True,
+        save_vecnormalize=True,
+    )
+    dummy_env = SoccerFieldEnv(render_mode="rgb_array", game_duration=30)
 
     env = DummyVecEnv([lambda: dummy_env])
 
-    model = PPO("MlpPolicy", env, verbose=1)
-    model.learn(total_timesteps=100000)
+    model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.00003)
+    model.learn(total_timesteps=1000000, callback=checkpoint_callback)
 
     model.save("soccer_agent_ppo")
 
