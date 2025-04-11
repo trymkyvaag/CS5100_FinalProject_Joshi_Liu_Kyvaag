@@ -1,13 +1,132 @@
+import os
+
 import gymnasium as gym
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import pygame
+from gymnasium import Wrapper
 from gymnasium import spaces
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 import rewards.heuristic
 from Visual_Components.field import SoccerField
+
+
+class RewardTracker(Wrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.episode_reward = 0
+        self.episode_rewards = []
+        self.episode_lengths = []
+        self.step_count = 0
+
+    def reset(self, **kwargs):
+        self.episode_reward = 0
+        observation, info = self.env.reset(**kwargs)
+        return observation, info
+
+    def step(self, action):
+        observation, reward, terminated, truncated, info = self.env.step(action)
+        self.episode_reward += reward
+        self.step_count += 1
+
+        if terminated or truncated:
+            self.episode_rewards.append(self.episode_reward)
+            self.episode_lengths.append(self.step_count - sum(self.episode_lengths))
+            info["episode"] = {
+                "r": self.episode_reward,
+                "l": self.episode_lengths[-1],
+                "episode_num": len(self.episode_rewards),
+            }
+            self.episode_reward = 0
+
+        return observation, reward, terminated, truncated, info
+
+    def get_stats(self):
+        stats = {
+            "episode_count": len(self.episode_rewards),
+            "total_steps": self.step_count,
+            "mean_reward": np.mean(self.episode_rewards) if self.episode_rewards else 0,
+            "median_reward": (
+                np.median(self.episode_rewards) if self.episode_rewards else 0
+            ),
+            "min_reward": np.min(self.episode_rewards) if self.episode_rewards else 0,
+            "max_reward": np.max(self.episode_rewards) if self.episode_rewards else 0,
+            "std_reward": np.std(self.episode_rewards) if self.episode_rewards else 0,
+            "mean_episode_length": (
+                np.mean(self.episode_lengths) if self.episode_lengths else 0
+            ),
+        }
+
+        if len(self.episode_rewards) >= 100:
+            stats["last_100_mean_reward"] = np.mean(self.episode_rewards[-100:])
+            stats["last_100_median_reward"] = np.median(self.episode_rewards[-100:])
+
+        return stats
+
+
+class RewardLoggingCallback(BaseCallback):
+    def __init__(self, reward_tracker, log_dir="./reward_logs/", verbose=0):
+        super(RewardLoggingCallback, self).__init__(verbose)
+        self.reward_tracker = reward_tracker
+        self.log_dir = log_dir
+        self.stats_history = []
+        os.makedirs(log_dir, exist_ok=True)
+
+    def _on_step(self):
+        return True
+
+    def _on_rollout_end(self):
+        stats = self.reward_tracker.get_stats()
+        stats["timesteps"] = self.num_timesteps
+        self.stats_history.append(stats)
+
+        if len(self.stats_history) % 10 == 0:
+            self._save_stats()
+
+    def _save_stats(self):
+        df = pd.DataFrame(self.stats_history)
+        df.to_csv(os.path.join(self.log_dir, "reward_stats.csv"), index=False)
+        self._create_plots()
+
+    def _create_plots(self):
+        if not self.stats_history:
+            return
+
+        df = pd.DataFrame(self.stats_history)
+
+        plt.figure(figsize=(20, 8))
+        plt.subplot(1, 2, 1)
+        plt.plot(df["timesteps"], df["mean_reward"], label="Mean Reward")
+        if "last_100_mean_reward" in df.columns:
+            plt.plot(
+                df["timesteps"],
+                df["last_100_mean_reward"],
+                label="Last 100 Episodes Mean",
+            )
+        plt.xlabel("Timesteps")
+        plt.ylabel("Reward")
+        plt.title("Reward vs Timesteps")
+        plt.legend()
+
+        plt.subplot(1, 2, 2)
+        plt.plot(df["timesteps"], df["min_reward"], label="Min")
+        plt.plot(df["timesteps"], df["max_reward"], label="Max")
+        plt.plot(df["timesteps"], df["median_reward"], label="Median")
+        plt.xlabel("Timesteps")
+        plt.ylabel("Reward")
+        plt.title("Min/Max/Median Reward vs Timesteps")
+        plt.legend()
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.log_dir, "reward_plots.png"))
+        plt.close()
+
+    def on_training_end(self):
+        self._save_stats()
 
 
 class SoccerFieldEnv(gym.Env):
@@ -233,11 +352,35 @@ if __name__ == "__main__":
         save_vecnormalize=True,
     )
     dummy_env = SoccerFieldEnv(render_mode="rgb_array", game_duration=30)
+    tracked_env = RewardTracker(dummy_env)
 
-    env = DummyVecEnv([lambda: dummy_env])
+    env = DummyVecEnv([lambda: tracked_env])
+    reward_logging_callback = RewardLoggingCallback(
+        tracked_env, log_dir="./reward_logs/"
+    )
 
-    model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.00003)
-    model.learn(total_timesteps=1000000, callback=checkpoint_callback)
+    # optuna
+    model = PPO(
+        "MlpPolicy",
+        env,
+        verbose=1,
+        learning_rate=9.374410314646429e-05,
+        n_steps=3296,
+        gamma=0.9708197855085876,
+        gae_lambda=0.9464920978639838,
+        ent_coef=0.010549674409905044,
+        clip_range=0.3941564070073835,
+        batch_size=3296,
+    )
+    model.learn(
+        total_timesteps=1000000, callback=[checkpoint_callback, reward_logging_callback]
+    )
+
+    # default params
+    # model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.00003)
+    # model.learn(
+    #     total_timesteps=1000000, callback=[checkpoint_callback, reward_logging_callback]
+    # )
 
     model.save("soccer_agent_ppo")
 
