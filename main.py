@@ -1,3 +1,10 @@
+"""
+main.py
+
+This script trains a PPO agent to play a custom 2v2 soccer game using Gymnasium and Stable-Baselines3.
+It features a custom environment, a reward tracker, a logging callback, and evaluation logic.
+"""
+
 import os
 
 import gymnasium as gym
@@ -21,7 +28,23 @@ set_seed(SEED)
 
 
 class RewardTracker(Wrapper):
+    """
+    A Gym wrapper that tracks reward statistics during training.
+
+    Attributes:
+        episode_reward (float): Accumulated reward for the current episode.
+        episode_rewards (list): List of total rewards from completed episodes.
+        episode_lengths (list): Length of each completed episode.
+        step_count (int): Total steps taken across all episodes.
+    """
+
     def __init__(self, env):
+        """
+        Initialize the RewardTracker wrapper.
+
+        Args:
+            env (gym.Env): The environment to wrap.
+        """
         super().__init__(env)
         self.episode_reward = 0
         self.episode_rewards = []
@@ -29,11 +52,27 @@ class RewardTracker(Wrapper):
         self.step_count = 0
 
     def reset(self, **kwargs):
+        """
+        Reset the environment and reward statistics for the new episode.
+
+        Returns:
+            observation (np.ndarray): Initial environment observation.
+            info (dict): Additional reset info.
+        """
         self.episode_reward = 0
         observation, info = self.env.reset(**kwargs)
         return observation, info
 
     def step(self, action):
+        """
+        Step the environment and track reward and episode statistics.
+
+        Args:
+            action (any): Action to perform.
+
+        Returns:
+            tuple: (observation, reward, terminated, truncated, info)
+        """
         observation, reward, terminated, truncated, info = self.env.step(action)
         self.episode_reward += reward
         self.step_count += 1
@@ -51,6 +90,12 @@ class RewardTracker(Wrapper):
         return observation, reward, terminated, truncated, info
 
     def get_stats(self):
+        """
+        Compute and return aggregated reward statistics.
+
+        Returns:
+            dict: Dictionary containing reward and episode statistics.
+        """
         stats = {
             "episode_count": len(self.episode_rewards),
             "total_steps": self.step_count,
@@ -74,6 +119,17 @@ class RewardTracker(Wrapper):
 
 
 class RewardLoggingCallback(BaseCallback):
+    """
+    A Stable-Baselines3 callback to log reward statistics and evaluate the model periodically.
+
+    Attributes:
+        reward_tracker (RewardTracker): The reward tracker used for stat collection.
+        eval_env (VecEnv): Evaluation environment.
+        log_dir (str): Directory to save CSV logs.
+        eval_freq (int): Frequency in timesteps to evaluate the model.
+        stats_history (list): Logged statistics history.
+    """
+
     def __init__(
         self,
         reward_tracker,
@@ -82,6 +138,16 @@ class RewardLoggingCallback(BaseCallback):
         eval_freq=50000,
         verbose=0,
     ):
+        """
+        Initialize the RewardLoggingCallback.
+
+        Args:
+            reward_tracker (RewardTracker): Tracker for training rewards.
+            eval_env (VecEnv): Environment used for periodic evaluation.
+            log_dir (str): Path to save CSV logs.
+            eval_freq (int): Timesteps between evaluations.
+            verbose (int): Verbosity level.
+        """
         super(RewardLoggingCallback, self).__init__(verbose)
         self.reward_tracker = reward_tracker
         self.eval_env = eval_env
@@ -92,9 +158,18 @@ class RewardLoggingCallback(BaseCallback):
         os.makedirs(log_dir, exist_ok=True)
 
     def _on_step(self):
+        """
+        Called at each environment step.
+
+        Returns:
+            bool: Always True to continue training.
+        """
         return True
 
     def _on_rollout_end(self):
+        """
+        Called at the end of each rollout to log training and evaluation metrics.
+        """
         stats = self.reward_tracker.get_stats()
         stats["timesteps"] = self.num_timesteps
 
@@ -128,10 +203,19 @@ class RewardLoggingCallback(BaseCallback):
             self._save_stats()
 
     def _save_stats(self):
+        """
+        Save reward and training stats to CSV.
+        """
         df = pd.DataFrame(self.stats_history)
         df.to_csv(os.path.join(self.log_dir, "reward_stats.csv"), index=False)
 
     def _evaluate_model(self):
+        """
+        Evaluate the current policy on the evaluation environment.
+
+        Returns:
+            tuple: (mean_reward, std_reward)
+        """
         if self.eval_env is None:
             return None, None
 
@@ -145,13 +229,30 @@ class RewardLoggingCallback(BaseCallback):
         return mean_reward, std_reward
 
     def on_training_end(self):
+        """
+        Called when training is completed to persist stats.
+        """
         self._save_stats()
 
 
 class SoccerFieldEnv(gym.Env):
+    """
+    A custom Gym environment simulating a 2v2 soccer game using Pygame.
+
+    The environment features multi-agent control, ball dynamics, goal scoring,
+    and support for both human and RGB rendering.
+    """
+
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
 
     def __init__(self, game_duration=30, render_mode=None):
+        """
+        Initialize the soccer environment.
+
+        Args:
+            game_duration (int): Length of a game in seconds.
+            render_mode (str): Either 'human' for display or 'rgb_array' for image frames.
+        """
         super(SoccerFieldEnv, self).__init__()
 
         self.scoring_team = None
@@ -224,6 +325,16 @@ class SoccerFieldEnv(gym.Env):
         self.reset()
 
     def reset(self, seed=None, options=None):
+        """
+        Reset the game environment for a new episode.
+
+        Args:
+            seed (int): Optional seed for randomization.
+            options (dict): Optional reset parameters.
+
+        Returns:
+            tuple: (observation, info)
+        """
         super().reset(seed=seed)
 
         self.soccer_field.reset_positions()
@@ -255,6 +366,12 @@ class SoccerFieldEnv(gym.Env):
         return observation, info
 
     def _get_observation(self):
+        """
+        Collect environment observations.
+
+        Returns:
+            np.ndarray: The current state observation.
+        """
         player_blue_1 = self.players[0]
         player_blue_2 = self.players[1]
         player_red_1 = self.players[2]
@@ -286,6 +403,15 @@ class SoccerFieldEnv(gym.Env):
         return observation
 
     def step(self, action):
+        """
+        Perform a step in the environment.
+
+        Args:
+            action (list[int]): Actions for the 4 players.
+
+        Returns:
+            tuple: (observation, reward, terminated, truncated, info)
+        """
         (
             action_agent_blue_1,
             action_agent_blue_2,
@@ -314,6 +440,13 @@ class SoccerFieldEnv(gym.Env):
         return observation, reward, terminated, truncated, info
 
     def _take_action(self, action, player_index):
+        """
+        Apply a single player's action.
+
+        Args:
+            action (int): The action to perform.
+            player_index (int): Index of the player.
+        """
 
         player = self.players[player_index]
         if not player.frozen:
@@ -336,20 +469,47 @@ class SoccerFieldEnv(gym.Env):
                 player.move(1, 0, self.width, self.height, self.players)
 
     def _update_game_state(self):
+        """
+        Update the game state, like detect ball collisions.
+        """
         self.soccer_field.check_player_ball_overlaps()
 
     def _calculate_reward(self):
+        """
+        Compute the reward based on current environment state.
+
+        Returns:
+            float: Computed reward.
+        """
         return rewards.heuristic.reward_function(self)
         # return rewards.checkpoint.reward_function(self)
 
     def _is_done(self):
+        """
+        Check whether the episode should terminate due to a goal.
+
+        Returns:
+            bool: Whether a terminal condition is met.
+        """
         return self.soccer_field.check_goal()[0]
 
     def _is_truncated(self):
+        """
+        Check whether the episode exceeded the time limit.
+
+        Returns:
+            bool: Whether the episode is truncated.
+        """
         elapsed_time = (pygame.time.get_ticks() - self.soccer_field.start_time) / 1000
         return elapsed_time > self.game_duration
 
     def _render_frame(self):
+        """
+        Render the game frame based on the render mode.
+
+        Returns:
+            np.ndarray or None: Image frame if 'rgb_array', else None.
+        """
         if self.screen is None:
             pygame.init()
             pygame.display.init()
@@ -365,10 +525,19 @@ class SoccerFieldEnv(gym.Env):
             )
 
     def render(self):
+        """
+        Render the environment externally.
+
+        Returns:
+            np.ndarray or None: Rendered frame if applicable.
+        """
         if self.render_mode == "rgb_array":
             return self._render_frame()
 
     def close(self):
+        """
+        Close the environment and Pygame resources.
+        """
         if self.screen is not None:
             import pygame
 
@@ -377,6 +546,7 @@ class SoccerFieldEnv(gym.Env):
 
 
 if __name__ == "__main__":
+    # === Callbacks ===
     checkpoint_callback = CheckpointCallback(
         save_freq=100000,
         save_path="./model_checkpoints/",
@@ -386,14 +556,27 @@ if __name__ == "__main__":
     )
 
     def make_train_env():
+        """
+        Factory function to create a training environment.
+
+        Returns:
+            gym.Env: A wrapped and monitored SoccerFieldEnv.
+        """
         base_env = Monitor(SoccerFieldEnv(render_mode="rgb_array", game_duration=30))
         return RewardTracker(base_env)
 
+    # === Training and Evaluation Environments ===
     env = DummyVecEnv([make_train_env])
     env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_reward=10.0)
     env.seed(SEED)
 
     def make_eval_env():
+        """
+        Factory function to create an evaluation environment.
+
+        Returns:
+            gym.Env: A monitored SoccerFieldEnv instance.
+        """
         return Monitor(SoccerFieldEnv(render_mode="rgb_array", game_duration=30))
 
     eval_env = DummyVecEnv([make_eval_env])
@@ -402,6 +585,7 @@ if __name__ == "__main__":
     eval_env.obs_rms = env.obs_rms
     eval_env.ret_rms = env.ret_rms
 
+    # === Logging Callback ===
     reward_logging_callback = RewardLoggingCallback(
         reward_tracker=env.venv.envs[0],
         eval_env=eval_env,
@@ -409,6 +593,7 @@ if __name__ == "__main__":
         eval_freq=50000,
     )
 
+    # === Model Configuration ===
     policy_kwargs = dict(net_arch=[dict(pi=[64, 64], vf=[128, 128, 64])])
 
     model = PPO(
@@ -427,11 +612,13 @@ if __name__ == "__main__":
         vf_coef=0.3,
     )
 
+    # === Training ===
     model.learn(
         total_timesteps=1_000_000,
         callback=[checkpoint_callback, reward_logging_callback],
     )
 
+    # === Saving ===
     model.save("soccer_agent_ppo")
     env.save("vec_normalize.pkl")
 
