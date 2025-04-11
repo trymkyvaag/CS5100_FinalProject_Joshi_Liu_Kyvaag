@@ -13,6 +13,10 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 import rewards.heuristic
 from Visual_Components.field import SoccerField
+from utils import set_seed
+
+SEED = 42
+set_seed(SEED)
 
 
 class RewardTracker(Wrapper):
@@ -351,10 +355,12 @@ if __name__ == "__main__":
         save_replay_buffer=True,
         save_vecnormalize=True,
     )
-    dummy_env = SoccerFieldEnv(render_mode="rgb_array", game_duration=30)
+    dummy_env = SoccerFieldEnv(render_mode="rgb_array", game_duration=60)
+    dummy_env.reset(seed=SEED)
     tracked_env = RewardTracker(dummy_env)
 
     env = DummyVecEnv([lambda: tracked_env])
+    env.seed(SEED)
     reward_logging_callback = RewardLoggingCallback(
         tracked_env, log_dir="./reward_logs/"
     )
@@ -363,6 +369,7 @@ if __name__ == "__main__":
     model = PPO(
         "MlpPolicy",
         env,
+        seed=SEED,
         verbose=1,
         learning_rate=9.374410314646429e-05,
         n_steps=3296,

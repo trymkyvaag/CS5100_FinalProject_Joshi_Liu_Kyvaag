@@ -7,3 +7,4 @@ six==1.17.0
 tzdata==2025.1
 gymnasium~=1.1.1
 stable_baselines3~=2.6.0
+matplotlib~=3.10.1
