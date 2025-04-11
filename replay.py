@@ -1,3 +1,9 @@
+"""
+replay.py
+
+This script loads a trained PPO agent and a VecNormalize object, and then evaluates the agent's performance in a
+SoccerField environment. The environment is then rendered allowing each individual episode to be observed.
+"""
 import random
 
 from stable_baselines3 import PPO
@@ -8,6 +14,11 @@ from main import SoccerFieldEnv
 
 
 def make_env():
+    """
+    Creates an instance of the SoccerFieldEnv that is monitored with rendering that is viewable.
+    Returns:
+        Monitor wrapped SoccerField environment for keeping track of individual episode statistics.
+    """
     return Monitor(SoccerFieldEnv(render_mode="human"))
 
 
