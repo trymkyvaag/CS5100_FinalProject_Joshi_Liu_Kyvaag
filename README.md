@@ -1,28 +1,96 @@
-# CS5100_FinalProject_Joshi_Liu_Kyvaag
 
-Final Project for CS5100 FAI
+# Duo Ball
 
-# Work in progress
+This project implements a custom 2v2 soccer game environment using PyGame and trains reinforcement learning agents (the blue team) using Proximal Policy Optimization (PPO) via Stable-Baselines3. The environment is Gym-compatible and built for flexible experimentation with reward shaping, curriculum learning, and hyperparameter tuning.
 
-## For early report use these instructions
+## Project Highlights
 
-1. Checkout the code.
-2. Shift to branch 7-git-ignore-readme-requirements
-3. Make sure python3 is installed, latest is better
-4. We recommend a venv `python3 -m venv .venv` and run `source .venv/bin/activate`
-5. Install requirements `pip install -r requirements.txt`
-6. To see live training set in main.py line 354 render_mode='human' else just run `python3 main.py` (we will use args
-   later for this) otherwise skip to point 9.
-7. Once training is done model_checkpoints is populated with checkpoints for 100k timesteps each, a final model named
-   soccer_agent_ppo.zip would be saved in the root directory of this project as well.
-8. During training a live graph and rewards csv would be populated in reward_logs directory.
-9. To replay with a trained model run `python3 replay.py` by setting the model you want to use in line 8 of replay.py,
-   by default we have the final trained model set
+- Trained PPO agents using heuristic-based rewards
+- Fully interactive 2v2 soccer simulation with PyGame rendering
+- Replay module to visualize trained agents
+- Reward logging, evaluation, and tuning via Optuna
+- Curriculum learning and baselines explored
 
-## Important note
+---
 
-1. We have two zip files for nonoptim and optuna for each of model checkpoints, reward_logs and soccer_agent_ppo (our
-   final model). Unzip the ones under model checkpoints and reward_logs to see the contents, use soccer_agent_ppo as
-   is. (don't unzip)
-2. The previous step is important to run point 9 of the instructions if you plan to use a checkpoint. If not just run
-   replay.py and you will use the trained model by default.
+## Project Structure
+
+```
+```
+
+---
+
+## Requirements
+
+- Python 3.8+
+
+Install dependencies via:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Running the Project
+
+### 1. Train the Agent
+
+```bash
+python main.py
+```
+
+- Trains PPO agents using the custom environment.
+- Saves models and reward stats periodically.
+
+### 2. Replay Trained Agent
+
+```bash
+python replay.py
+```
+
+- Loads `soccer_agent_ppo.zip` and visualizes 5 evaluation episodes.
+- Evaluates agent behavior against baseline red team.
+
+---
+
+## Logging & Evaluation
+
+- Reward metrics (mean, median, std, etc.) are logged to `reward_stats.csv`
+- Visualizations (e.g., reward curves, explained variance) can be generated for reporting.
+- Evaluation mean rewards logged periodically during training.
+
+---
+
+## Key Features
+
+- Multi-agent discrete control using `MultiDiscrete` action space
+- Custom Gym-compatible environment
+- Dense 15-D observation vector with player and ball state
+- Manual and Optuna-based hyperparameter tuning
+- Support for curriculum learning (configurable red team behavior)
+
+---
+
+## Reference Papers
+
+- Kurach et al., [Google Research Football: A Novel RL Environment](https://arxiv.org/abs/1907.11180)
+- Schulman et al., [Proximal Policy Optimization Algorithms](https://arxiv.org/abs/1707.06347)
+- Matiisen et al., [Teacher-Student Curriculum Learning](https://arxiv.org/abs/1707.00183)
+  
+---
+
+## Credits
+
+Developed as part of a course project on 5100 Foundations of AI. Built and maintained by Sanjiv, Trym and Eason.
+
+---
+
+## TODOs / Future Work
+
+- Self-play and red team training
+- Imitation learning from expert trajectories
+- Transition to continuous action space
+- Curriculum learning enhancements
+
+---
