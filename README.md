@@ -16,6 +16,31 @@ This project implements a custom 2v2 soccer game environment using PyGame and tr
 ## Project Structure
 
 ```
+.
+├── LICENSE
+├── main.py                                (main training loop with reward logging)
+├── model_checkpoints
+│   ├── (there would be model checkpoints and their vec_normalize here when training)
+├── README.md
+├── replay.py                              (for replaying using a model)
+├── requirements.txt 
+├── reward_logs                            (a reward_stats.csv generates here for every training run)
+│   ├── priors                             (a folder having reward zips for previous runs)
+│   │   ├── reward_nonoptim.zip
+│   │   ├── reward_optuna_.zip
+│   └── reward_stats.csv
+├── rewards
+│   ├── heuristic.py                        (a place for custom reward functions)
+├── prior_models                            (previous models for replay usage)
+│   ├── soccer_agent_ppo_non_optim.zip
+│   ├── soccer_agent_ppo_optuna.zip
+├── soccer_agent_ppo.zip                    (current model)
+├── utils.py                                (helper functions)
+├── vec_normalize.pkl                       (current model's vectors)
+└── Visual_Components                       (pygame implementation)
+    ├── ball.py
+    ├── field.py
+    └── player.py
 ```
 
 ---
