@@ -123,6 +123,11 @@ Developed as part of a course project on 5100 Foundations of AI. Built and maint
 
 ## Miscellaneous notes
 Its important to note that in order to run previous models (before vector normalization), you have to check out that particular branch which
-first introduced it and then run `replay.py`
-
+first introduced it and then run `replay.py` of that branch which is built for it.
+Example.
+- For most recent use `main`
+- For our first basic implementation checkout `4-we-hitting-the-gym-baby`
+- For non optuna checkout `5-first-take-at-a-good-reward-function`
+- For optuna checkout `6-optuna-vs-norma`
+- For curriculum checkout `currLearn`
 ---
