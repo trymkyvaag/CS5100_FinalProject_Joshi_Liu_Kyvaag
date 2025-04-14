@@ -118,4 +118,11 @@ Developed as part of a course project on 5100 Foundations of AI. Built and maint
 - Transition to continuous action space
 - Curriculum learning enhancements
 
+  
+---
+
+## Miscellaneous notes
+Its important to note that in order to run previous models (before vector normalization), you have to check out that particular branch which
+first introduced it and then run `replay.py`
+
 ---
