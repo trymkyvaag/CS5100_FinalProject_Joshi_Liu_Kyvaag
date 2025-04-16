@@ -1,5 +1,5 @@
 
-# Duo Ball
+# Duo Ball                                                                             [Git](https://github.com/trymkyvaag/CS5100_FinalProject_Joshi_Liu_Kyvaag)
 
 This project implements a custom 2v2 soccer game environment using PyGame and trains reinforcement learning agents (the blue team) using Proximal Policy Optimization (PPO) via Stable-Baselines3. The environment is Gym-compatible and built for flexible experimentation with reward shaping, curriculum learning, and hyperparameter tuning.
 
